@@ -10,15 +10,15 @@ class FixedMCTS(MCTS):
         explorationRate = kwargs.get('explorationRate')
         timeLimit = kwargs.get('timeLimit')
         playLimit = kwargs.get('playLimit')
-        threads = kwargs.get('threads', 1) 
 
         assert self.MaxDepth > 0, 'MaxDepth for MCTS must be > 0.'
 
-        super().__init__(explorationRate, timeLimit, playLimit, threads)
+        super().__init__(explorationRate, timeLimit, playLimit)
     
     # Overriding from MCTS
     def FindLeaf(self, node, temp):
         lastAction = None
+        branch = [node]
         for _ in range(self.MaxDepth):
             if node.Children is None:
                 if node.State.Winner(lastAction) is not None:
@@ -28,6 +28,7 @@ class FixedMCTS(MCTS):
                 break
             lastAction = self._selectAction(node, temp)
             node = node.Children[lastAction]
+            branch.append(node)
         assert lastAction is not None, 'There is at least one legal option.'
             
-        return node
+        return branch

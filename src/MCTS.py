@@ -13,7 +13,7 @@ class Node(object):
         self.Plays = 0
         self.LegalActions = np.array(legalActions)
         self.Children = None
-        self.Parent = None
+        self.Parents = []
         
         # Use the legal actions mask to ignore priors that don't make sense.
         self.Priors = np.multiply(priors, legalActions)
@@ -49,15 +49,13 @@ class MCTS(object):
         to be overriden to avoid a NotImplemenetedError.
     """
     def __init__(self, explorationRate,
-        timeLimit = None, playLimit = None, threads = 1, **kwargs):
+        timeLimit = None, playLimit = None, **kwargs):
         
         self.TimeLimit = timeLimit
         self.PlayLimit = playLimit
         self.ExplorationRate = explorationRate
         self.Root = None
-        self.Threads = threads
-        if self.Threads > 1:
-            self.Pool = mp.Pool(processes = self.Threads)
+        self.NodeCache = {}
             
     def FindMove(self, state, temp = 0.1, moveTime = None, playLimit = None):
         """ Given a game state, this will use a Monte Carlo Tree Search
@@ -81,67 +79,24 @@ class MCTS(object):
         assert self.Root.State == state, 'Primed for the correct input state.'
         assert endTime is not None or playLimit is not None, 'MCTS algorithm has a cutoff.'
         
-        if self.Threads == 1:
-            self._runMCTS(self.Root, temp, endTime, playLimit)
-        elif self.Threads > 1:
-            self._runAsynch(state, temp, endTime, playLimit)
+        self._runMCTS(self.Root, temp, endTime, playLimit)
 
         action = self._selectAction(self.Root, temp, exploring = False)
 
         return (self._applyAction(state, action), self.Root.WinRate(),
             self.Root.ChildProbability())
 
-    def _runAsynch(self, state, temp, endTime = None, nPlays = None):
-        roots = []
-        results = []
-        for i in range(self.Threads):
-            root = Node(state, state.LegalActions(), self.GetPriors(state))
-
-            results.append(
-                self.Pool.apply_async(
-                    self._runMCTS, (root, temp, endTime, nPlays)))
-
-        for r in results:
-            roots.append(r.get())
-
-        self._mergeAll(self.Root, roots)
-        return
-
     def _runMCTS(self, root, temp, endTime = None, nPlays = None):
         endPlays = root.Plays + (nPlays if nPlays is not None else 0)
         while ((endTime is None or (time() < endTime or root.Children is None))
                 and (nPlays is None or root.Plays < endPlays)):
-            node = self.FindLeaf(root, temp)
-            
+            branch = self.FindLeaf(root, temp)
+            node = branch[-1]
+
             val = self.SampleValue(node.State, node.State.PreviousPlayer)
-            self.BackProp(node, val, node.State.PreviousPlayer)
+            self.BackProp(branch, val, node.State.PreviousPlayer)
 
         return root
-
-    def _mergeAll(self, target, trees):
-        for t in trees:
-            target.Plays += t.Plays
-            target.Value += t.Value
-        
-        continuedTrees = [t for t in trees if t.Children is not None]
-        if len(continuedTrees) == 0:
-            return
-        if target.Children is None:
-            t = continuedTrees[0]
-            target.Children = t.Children
-            t.Children = None
-            for c in target.Children:
-                if c is not None:
-                    c.Parent = target
-            del continuedTrees[0]
-
-        for i in range(len(target.Children)):
-            if target.Children[i] is None:
-                continue
-            self._mergeAll(
-                target.Children[i], [t.Children[i] for t in continuedTrees])
-
-        return
 
     def _selectAction(self, root, temp, exploring = True):
         """ Selects a child of the root using an upper confidence interval. If
@@ -152,16 +107,20 @@ class MCTS(object):
         assert root.Children is not None, 'The node has children to select.'
         
         if exploring or temp == 0:
-            allPlays = sum(root.ChildPlays())
+            allPlays = np.sum(root.ChildPlays())
             upperConfidence = (root.ChildWinRates()
                 + (self.ExplorationRate * root.Priors * np.sqrt(1.0 + allPlays))
                 / (1.0 + root.ChildPlays()))
             choice = np.argmax(upperConfidence)
             p = None
         else:
-            allPlays = sum([p**(1/temp) for p in root.ChildPlays()])
-            p = [c**(1/temp) / allPlays for c in root.ChildPlays()]
-            choice = np.random.choice(len(root.ChildPlays()), p=p)
+            if temp < 0.1:
+                choice = np.argmax(root.ChildPlays())
+                p = None
+            else:
+                allPlays = np.sum([p**(1/temp) for p in root.ChildPlays()])
+                p = [c**(1/temp) / allPlays for c in root.ChildPlays()]
+                choice = np.random.choice(len(root.ChildPlays()), p=p)
         
         assert root.LegalActions[choice] == 1, 'Illegal move: \n{}'.format(
             '\n'.join([
@@ -183,8 +142,9 @@ class MCTS(object):
         for i in range(l):
             if node.LegalActions[i] == 1:
                 s = self._applyAction(node.State, i)
-                node.Children[i] = Node(s, s.LegalActions(), self.GetPriors(s))
-                node.Children[i].Parent = node
+                
+                node.Children[i] = self.NodeCache.get(s, Node(s, s.LegalActions(), self.GetPriors(s)))
+                node.Children[i].Parents.append(node)
         return
 
     def MoveRoot(self, states):
@@ -210,26 +170,19 @@ class MCTS(object):
                 break
         return
 
-    def ResetRoot(self):
-        if self.Root is None:
-            return
-        while self.Root.Parent is not None:
-            self.Root = self.Root.Parent
-        return
-
     def DropRoot(self):
         self.Root = None
+        self.NodeCache = {}
         return
 
-    def BackProp(self, leaf, stateValue, playerForValue):
-        leaf.Plays += 1
-        if leaf.Parent is not None:
-            if leaf.Parent.State.Player == playerForValue:
-                leaf.Value += stateValue
-            else:
-                leaf.Value += 1 - stateValue
-
-            self.BackProp(leaf.Parent, stateValue, playerForValue)
+    def BackProp(self, branch, stateValue, playerForValue):
+        for node in branch:
+            node.Plays += 1
+            if len(node.Parents) > 0:
+                if node.Parents[0].State.Player == playerForValue:
+                    node.Value += stateValue
+                else:
+                    node.Value += 1 - stateValue
         return
     
     def _applyAction(self, state, action):

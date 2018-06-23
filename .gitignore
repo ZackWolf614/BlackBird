@@ -274,3 +274,5 @@ NextNetworkParams.yaml
 .vscode/*
 logDir/*
 src/goodGames.txt
+Profile.py
+profile.tsv

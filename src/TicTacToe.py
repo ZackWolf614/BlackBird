@@ -129,7 +129,7 @@ class BoardState(GameState):
         return "{0}{1}".format(self.Player,str(self)).__hash__()
 
 if __name__ == '__main__':
-    params = {'maxDepth' : 10, 'explorationRate' : 1.414, 'playLimit' : 5000}
+    params = {'maxDepth' : 10, 'explorationRate' : 1.414, 'playLimit' : 300}
     player = FixedMCTS(**params)
     BoardState.Size = 3
     BoardState.InARow = 3
@@ -138,7 +138,7 @@ if __name__ == '__main__':
     while state.Winner() is None:
         print(state)
         print('To move: {}'.format(state.Player))
-        state, v, p = player.FindMove(state)
+        state, v, p = player.FindMove(state, 0)
         print('Value: {}'.format(v))
         print('Selection Probabilities: {}'.format(p))
         print('Child Values: {}'.format(player.Root.ChildWinRates()))
