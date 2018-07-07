@@ -8,6 +8,8 @@ import functools
 import random
 import yaml
 import numpy as np
+import uuid
+import os
 
 np.seterr(divide='ignore', invalid='ignore')
 np.set_printoptions(precision=2)
@@ -182,7 +184,8 @@ def GenerateTrainingSamples(model, nGames, temp, conn=None):
             else:
                 example.Reward = 1 if example.State.Player == winner else -1
             if conn is not None:
-                serialized = state.SerializeState(example.State, example.Probabilities, example.Reward)
+                serialized = state.SerializeState(
+                    example.State, example.Probabilities, example.Reward)
                 conn.PutGame(state.GameType, serialized)
 
         examples += gameHistory
@@ -227,6 +230,7 @@ def TrainWithExamples(model, examples, batchSize, learningRate, teacher=None):
 
 
 class Model(MCTS, Network):
+    ModelDirectory = 'blackbird_models'
     """ Class which encapsulates MCTS powered by a neural network.
 
         The BlackBird class is designed to learn how to win at a board game, by
@@ -247,13 +251,34 @@ class Model(MCTS, Network):
         self.MCTSConfig = mctsConfig
         self.NetworkConfig = networkConfig
         self.TensorflowConfig = tensorflowConfig
+
         MCTS.__init__(self, **mctsConfig)
 
+        saveDir = self._createFolder()
+
         if networkConfig != {}:
-            Network.__init__(self, name, NetworkFactory(
+            Network.__init__(self, saveDir, NetworkFactory(
                 networkConfig), tensorflowConfig)
         else:
-            Network.__init__(self, name, tensorflowConfig=tensorflowConfig)
+            Network.__init__(self, saveDir, tensorflowConfig=tensorflowConfig)
+
+    def _createFolder(self):
+        saveDir = os.path.join(Model.ModelDirectory, self.Name)
+        if not os.path.isdir(Model.ModelDirectory):
+            os.mkdir(Model.ModelDirectory)
+        if not os.path.isdir(saveDir):
+            os.mkdir(saveDir)
+
+        idf = os.path.join(saveDir, '.uuid')
+        if not os.path.isfile(idf):
+            self.UUID = str(uuid.uuid4().hex)
+            with open(idf, 'w') as fout:
+                fout.write(self.UUID)
+        else:
+            with open(idf, 'r') as fin:
+                self.UUID = fin.read()
+
+        return saveDir
 
     def LastVersion(self):
         return Model(self.Game, self.Name, self.MCTSConfig, self.NetworkConfig, self.TensorflowConfig)

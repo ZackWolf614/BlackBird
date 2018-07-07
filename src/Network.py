@@ -7,8 +7,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
 class Network:
-    def __init__(self, name, networkConstructor=None, tensorflowConfig={}):
-        self.Name = name
+    def __init__(self, saveDir, networkConstructor=None, tensorflowConfig={}):
 
         self.batchCount = 0
 
@@ -20,14 +19,14 @@ class Network:
             gpu_options=gpuOptions), graph=self.graph)
 
         with self.graph.as_default():
-            if not self.loadModel(name):
+            if not self.loadModel(saveDir):
                 networkConstructor()
                 self.grabVariables()
                 self.sess.run(tf.global_variables_initializer())
-                self.saveModel(name)
+                self.saveModel(saveDir)
 
-        self.writer = tf.summary.FileWriter(
-            os.path.join('blackbird_summary', name), graph=self.sess.graph)
+        self.writer = tf.summary.FileWriter(os.path.join(
+            saveDir, 'summary'), graph=self.sess.graph)
 
     def __del__(self):
         self.sess.close()
@@ -84,24 +83,18 @@ class Network:
             summary = self.sess.run(self.lossMerged, feed_dict=feed_dict)
             self.writer.add_summary(summary, self.batchCount)
 
-    def saveModel(self, name=None):
+    def saveModel(self, saveDir):
         """ Write the state of the network to a file.
             This should be reserved for "best" networks.
         """
-        if name is None:
-            name = self.Name
-        saveDir = os.path.join('blackbird_models', name)
-        if not os.path.isdir('blackbird_models'):
-            os.mkdir('blackbird_models')
         if not os.path.isdir(saveDir):
             os.mkdir(saveDir)
         with self.sess.graph.as_default():
             tf.train.Saver().save(self.sess, os.path.join(saveDir, 'best'))
 
-    def loadModel(self, name):
+    def loadModel(self, saveDir):
         """ Load an old version of the network.
         """
-        saveDir = os.path.join('blackbird_models', name)
         metaPath = os.path.join(saveDir, 'best.meta')
         if not os.path.isdir(saveDir) or not os.path.isfile(metaPath):
             return False
