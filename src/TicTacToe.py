@@ -1,6 +1,9 @@
 from FixedMCTS import FixedMCTS
 from DynamicMCTS import DynamicMCTS
 from GameState import GameState
+from proto.state_pb2 import State
+
+import json
 import numpy as np
 
 class BoardState(GameState):
@@ -12,7 +15,8 @@ class BoardState(GameState):
     LegalMoves = Size ** 2
 
     def __init__(self):
-        self.Board = np.zeros((self.Size, self.Size, 2))
+        self.GameType = 'TicTacToe'
+        self.Board = np.zeros((self.Size, self.Size, 2), dtype=np.uint8)
         self.Player = 1
         self.PreviousPlayer = None
 
@@ -45,7 +49,7 @@ class BoardState(GameState):
 
     def AsInputArray(self):
         player = np.full((self.Size, self.Size), 1 if self.Player == 1 else -1)
-        array = np.zeros((1, self.Size, self.Size, 3))
+        array = np.zeros((1, self.Size, self.Size, 3), dtype=np.uint8)
         array[0, :, :, 0:2] = self.Board
         array[0, :, :, 2] = player
         return array
@@ -74,6 +78,28 @@ class BoardState(GameState):
     def EvalToString(self, eval):
         reshapedEval = eval.reshape(3, 3)
         return str(reshapedEval)
+
+    def SerializeState(self, state, policy, evaluation):
+        serialized = State()
+
+        serialized.player = state.Player
+        serialized.mctsEval = evaluation
+        serialized.mctsPolicy = policy.tobytes()
+        serialized.boardEncoding = state.Board.tobytes()
+        serialized.boardDims = np.array([self.Size, self.Size, 2], dtype=np.uint8).tobytes()
+        return serialized.SerializeToString()
+
+    def DeserializeState(self, serialState):
+        state = State()
+        state.ParseFromString(serialState)
+        dims = np.frombuffer(state.boardDims, dtype=np.uint8)
+
+        return {
+            'player': state.player,
+            'mctsEval': state.mctsEval,
+            'mctsPolicy': np.frombuffer(state.mctsPolicy, dtype=np.float).reshape(dims[:2]),
+            'board': np.frombuffer(state.boardEncoding, dtype=np.uint8).reshape(dims)
+        }
 
     def _isOver(self, board):
         return np.sum(board > 0) == self.Size * self.Size

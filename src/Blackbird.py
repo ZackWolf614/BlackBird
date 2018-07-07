@@ -122,7 +122,7 @@ def TestModels(model1, model2, temp, numTests):
     }
 
 
-def GenerateTrainingSamples(model, nGames, temp):
+def GenerateTrainingSamples(model, nGames, temp, conn=None):
     """ Generates self-play games to learn from.
 
         This method generates `nGames` self-play games, and returns them as
@@ -181,6 +181,9 @@ def GenerateTrainingSamples(model, nGames, temp):
                 example.Reward = 0
             else:
                 example.Reward = 1 if example.State.Player == winner else -1
+            if conn is not None:
+                serialized = state.SerializeState(example.State, example.Probabilities, example.Reward)
+                conn.PutGame(state.GameType, serialized)
 
         examples += gameHistory
 

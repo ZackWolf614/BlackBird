@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+message State {
+    int32 player = 1;
+    float mctsEval = 2;
+    bytes mctsPolicy = 3;
+    bytes boardEncoding = 4;
+    bytes boardDims = 5;
+}

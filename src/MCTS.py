@@ -38,7 +38,7 @@ class Node(object):
         self.Priors = np.multiply(priors, legalActions)
 
         self._childWinRates = np.zeros(len(legalActions))
-        self._childPlays = np.zeros(len(legalActions))
+        self._childPlays = np.zeros(len(legalActions), dtype=np.float)
 
     def WinRate(self):
         """ Samples the win rate of the Node after MCTS.
@@ -64,7 +64,7 @@ class Node(object):
                 sampled.
         """
         allPlays = sum(self.ChildPlays())
-        zeroProbs = np.zeros((len(self.ChildPlays())))
+        zeroProbs = np.zeros((len(self.ChildPlays())), dtype=np.float)
         return self.ChildPlays() / allPlays if allPlays > 0 else zeroProbs
 
     def ChildWinRates(self):
