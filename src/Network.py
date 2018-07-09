@@ -19,19 +19,14 @@ class Network:
             gpu_options=gpuOptions), graph=self.graph)
 
         with self.graph.as_default():
-            if not self.loadModel(saveDir):
+            with self.sess.as_default():
                 networkConstructor()
                 self.grabVariables()
                 self.sess.run(tf.global_variables_initializer())
                 self.saveModel(saveDir)
 
-        self.writer = tf.summary.FileWriter(os.path.join(
-            saveDir, 'summary'), graph=self.sess.graph)
-
     def __del__(self):
         self.sess.close()
-        if self.writer is not None:
-            self.writer.close()
 
     def grabVariables(self):
         self.input = tf.get_collection('input')[0]
@@ -80,8 +75,8 @@ class Network:
         self.sess.run(self.trainingOp, feed_dict=feed_dict)
         self.batchCount += 1
         if self.batchCount % 10 == 0:
+            # TODO : Log this data in a way that we can actually use it.
             summary = self.sess.run(self.lossMerged, feed_dict=feed_dict)
-            self.writer.add_summary(summary, self.batchCount)
 
     def saveModel(self, saveDir):
         """ Write the state of the network to a file.
@@ -91,16 +86,3 @@ class Network:
             os.mkdir(saveDir)
         with self.sess.graph.as_default():
             tf.train.Saver().save(self.sess, os.path.join(saveDir, 'best'))
-
-    def loadModel(self, saveDir):
-        """ Load an old version of the network.
-        """
-        metaPath = os.path.join(saveDir, 'best.meta')
-        if not os.path.isdir(saveDir) or not os.path.isfile(metaPath):
-            return False
-
-        saver = tf.train.import_meta_graph(metaPath, clear_devices=True)
-        saver.restore(self.sess, os.path.join(saveDir, 'best'))
-        for k in self.graph.collections:
-            setattr(self, k, tf.get_collection(k)[0])
-        return True

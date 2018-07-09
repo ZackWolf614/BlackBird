@@ -4,6 +4,7 @@ import yaml
 sys.path.insert(0, './src/')
 
 import Blackbird
+import tensorflow as tf
 from DataManager import Connection
 from TicTacToe import BoardState
 
@@ -18,12 +19,13 @@ def APITest():
         'mcts'), parameters.get('network'), parameters.get('tensorflow'))
     conn = Connection(1)
 
-    examples = Blackbird.GenerateTrainingSamples(model,
-                                                 10,
-                                                 parameters.get('mcts').get('temperature').get('exploration'),
-                                                 conn)
-    Blackbird.TrainWithExamples(
-        model, examples, batchSize=10, learningRate=0.01)
+    # examples = Blackbird.GenerateTrainingSamples(model,
+    #                                              10,
+    #                                              parameters.get('mcts').get(
+    #                                                  'temperature').get('exploration'),
+    #                                              conn)
+    # Blackbird.TrainWithExamples(
+    #     model, examples, batchSize=10, learningRate=0.01)
 
     print('Against a random player:')
     print(Blackbird.TestRandom(model,
@@ -31,20 +33,24 @@ def APITest():
                                    'temperature').get('exploitation'),
                                10))
 
-    print('Against the last best player:')
-    print(Blackbird.TestPrevious(model,
-                                 parameters.get('mcts').get(
-                                     'temperature').get('exploitation'),
-                                 10))
+    #print('Against the last best player:')
+    # print(Blackbird.TestPrevious(model,
+    #                              parameters.get('mcts').get(
+    #                                  'temperature').get('exploitation'),
+    #                              10))
 
-    print('Against a good player:')
-    print(Blackbird.TestGood(model,
-                             parameters.get('mcts').get(
-                                 'temperature').get('exploitation'),
-                             10))
+    # print('Against a good player:')
+    # print(Blackbird.TestGood(model,
+    #                          parameters.get('mcts').get(
+    #                              'temperature').get('exploitation'),
+    #                          10))
 
     print('\n')
     del model
+    sess = tf.get_default_graph()
+    print(str(sess))
+    print('after closing')
+    print('closing sess')
 
 
 if __name__ == '__main__':

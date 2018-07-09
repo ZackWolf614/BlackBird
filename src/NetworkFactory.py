@@ -1,4 +1,5 @@
 import tensorflow as tf
+import os
 
 
 class NetworkFactory(object):
@@ -9,14 +10,29 @@ class NetworkFactory(object):
 
     def __init__(self, networkConfig):
         self.NetworkConfig = networkConfig
-        self.alpha = networkConfig.get('policy').get('dirichlet').get('alpha')
-        self.epsilon = networkConfig.get(
-            'policy').get('dirichlet').get('epsilon')
-        self.dims = networkConfig.get('dims')
-        self.policyShape = networkConfig.get('policyShape')
-        self.hasTeacher = networkConfig.get('hasTeacher')
+        if isinstance(networkConfig, dict):
+            self.alpha = networkConfig.get('policy').get('dirichlet').get('alpha')
+            self.epsilon = networkConfig.get(
+                'policy').get('dirichlet').get('epsilon')
+            self.dims = networkConfig.get('dims')
+            self.policyShape = networkConfig.get('policyShape')
+            self.hasTeacher = networkConfig.get('hasTeacher')
+            setattr(self, '__call__', self.buildNew)
+
 
     def __call__(self):
+        if isinstance(self.NetworkConfig, dict):
+            self.buildNew()
+        else:
+            self.loadFromFile()
+
+    def loadFromFile(self):
+        meta = os.path.join(self.NetworkConfig, 'best.meta')
+        saver = tf.train.import_meta_graph(meta, clear_devices=True)
+        saver.restore(tf.get_default_session(), os.path.join(self.NetworkConfig, 'best'))
+
+
+    def buildNew(self):
         """ Build out the policy/evaluation combo network
         """
         with tf.variable_scope('inputs', reuse=tf.AUTO_REUSE):
