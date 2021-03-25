@@ -20,7 +20,7 @@ protobuf==3.6.0
 Pygments==2.2.0
 pyparsing==2.2.0
 pytz==2018.5
-PyYAML==3.12
+PyYAML==5.4
 requests==2.19.1
 six==1.11.0
 snowballstemmer==1.2.1
