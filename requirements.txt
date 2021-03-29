@@ -17,7 +17,7 @@ MarkupSafe==1.0
 numpy==1.14.5
 packaging==17.1
 protobuf==3.6.0
-Pygments==2.2.0
+Pygments==2.7.4
 pyparsing==2.2.0
 pytz==2018.5
 PyYAML==3.12
